@@ -1,0 +1,122 @@
+const axios = require('axios');
+const fs = require('fs');
+
+
+
+class Search {
+    history = [];
+    dbPath = './db/database.json';
+
+
+    constructor() {
+        this.readDB();
+    }
+
+    get historyCapitalization() {
+        return this.history.map(place => {
+            let words = place.split('');
+            return words.map(l => l[0].toUpperCase() + l.substring(1)).join('')
+
+        });
+    }
+    get paramsMaxbox() {
+        return {
+            'access_token': process.env.MAPBOXS_KEY,
+            'limit': 5,
+        }
+    }
+
+    get paramsWeather() {
+        return {
+            appid: process.env.OPENWEATHER_KEY,
+            units: 'metric'
+
+        }
+    }
+
+    async city(place = '') {
+        try {
+            const instance = axios.create({
+                baseURL: `https://api.mapbox.com/geocoding/v5/mapbox.places/${place}.json`,
+                params: this.paramsMaxbox,
+            });
+            const resp = await instance.get();
+            return resp.data.features.map(place => ({
+                id: place.id,
+                name: place.place_name,
+                lng: place.center[0],
+                lat: place.center[1],
+
+            }));
+            return [];//places laign to the cuty
+        } catch (err) {
+            return [];
+        }
+    }
+
+
+    async getWeather(lon, lat) {
+        try {
+            const instance = axios.create({
+                baseURL: `https://api.openweathermap.org/data/2.5/weather`,
+                params: { ...this.paramsWeather, lat, lon, }
+            });
+            const data = await instance.get();
+            const { weather, main } = data.data;
+
+            return {
+                description: weather[0].description,
+                temp: main.temp,
+                min: main.temp_min,
+                max: main.temp_max,
+            }
+
+
+        } catch (err) {
+            console.log(err);
+        }
+    }
+
+
+    addHistory(place = '') {
+        console.log(this.history);
+        if (this.history.includes(place.toLocaleLowerCase())) {
+            return;
+        }
+        this.history = this.history.splice(0, 5);
+        this.history.unshift(place.toLocaleLowerCase);
+
+        this.saveDB();
+    }
+
+
+    saveDB() {
+
+        const payload = {
+            history: this.history
+        };
+        fs.writeFileSync(this.dbPath, JSON.stringify(payload));
+    }
+
+
+    readDB() {
+
+        if (!fs.existsSync(this.dbPath)) return;
+        const info = fs.readFileSync(this.dbPath, { encoding: 'utf-8' });
+        const data = JSON.parse(info);//aqui tendre un objeto literal de javascript 
+        this.history = data.history;
+
+    }
+
+    getHistoryCapitalized() {
+        let historyCap = [];
+        const list = this.readDB();
+        list.array.forEach((element, i) => {
+            historyCap = element[i].toLocaleLowerCase();
+        });
+        return historyCap;
+    }
+}
+
+module.exports = Search;
+            // const resp = await axios.get(`https://api.mapbox.com/geocoding/v5/mapbox.places/tunja.json?limit=5&proximity=ip&access_token=pk.eyJ1Ijoia2ltYmVybGx5IiwiYSI6ImNsaTl6dnJtMDE2bW8zZW1wcjk3djNhZjQifQ.03nuyn38PQfBJm_pyPet1A`);
